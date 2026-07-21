@@ -9,3 +9,5 @@ coverage
 .playwright-cli
 output/playwright/*
 !output/playwright/desktop-empty.png
+!output/playwright/ticket-run-desktop.png
+!output/playwright/ticket-run-mobile.png
