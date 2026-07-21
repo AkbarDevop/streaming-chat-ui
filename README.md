@@ -2,8 +2,7 @@
 
 A polished, protocol-correct frontend for sequential WebSocket coaching chat. It streams assistant text while keeping tool calls, tool output, and hidden reasoning entirely server-side.
 
-[![CI](https://github.com/AkbarDevop/streaming-chat-ui/actions/workflows/ci.yml/badge.svg)](https://github.com/AkbarDevop/streaming-chat-ui/actions/workflows/ci.yml)
-[![Deploy to GitHub Pages](https://github.com/AkbarDevop/streaming-chat-ui/actions/workflows/deploy-pages.yml/badge.svg)](https://github.com/AkbarDevop/streaming-chat-ui/actions/workflows/deploy-pages.yml)
+[Open the live demo](https://akbardevop.github.io/streaming-chat-ui/)
 
 ![Fieldnote conversation workspace](output/playwright/desktop-empty.png)
 
@@ -91,7 +90,14 @@ npm run preview    # serve the production bundle
 
 ## Deployment
 
-Every push to `main` runs tests, type checking, and a production build. The Pages workflow publishes `dist/` to GitHub Pages. The Vite build uses relative asset paths, so it works under a repository subpath.
+The live site is served from the `gh-pages` branch. To publish the current production build manually:
+
+```bash
+npm run build
+npx gh-pages --dist dist --nojekyll
+```
+
+The included CI and deployment workflows can run the same verification and publish flow from GitHub Actions. The Vite build uses relative asset paths, so it works under a repository subpath.
 
 For a live backend, either set `VITE_CHAT_WS_URL` during the build or enter the endpoint in the deployed app. Your WebSocket server must accept connections from the deployed page’s origin.
 
