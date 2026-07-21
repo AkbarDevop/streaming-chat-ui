@@ -4,6 +4,8 @@ An exploratory frontend for matching engineers to open tickets worth shipping.
 
 This pivot lives on `pivot/engineer-ticket-match`; the shipped Cofounder Match product remains untouched on `main`.
 
+[Try the live prototype](https://ticket-run-demo-akbar.netlify.app)
+
 ![ticket.run engineer-ticket matching prototype](output/playwright/ticket-run-desktop.png)
 
 ## Product thesis
