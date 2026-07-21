@@ -305,12 +305,14 @@ textarea:focus-visible {
   position: relative;
   display: grid;
   grid-template-rows: auto auto minmax(0, 1fr) auto;
+  height: 100%;
   min-width: 0;
   min-height: 0;
   overflow: hidden;
 }
 
 .workspace-header {
+  grid-row: 1;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -404,6 +406,7 @@ textarea:focus-visible {
 }
 
 .error-banner {
+  grid-row: 2;
   display: flex;
   gap: 12px;
   align-items: flex-start;
@@ -425,6 +428,7 @@ textarea:focus-visible {
 }
 
 .conversation {
+  grid-row: 3;
   min-height: 0;
   overflow-x: hidden;
   overflow-y: auto;
@@ -676,6 +680,7 @@ textarea:focus-visible {
 .composer-wrap {
   position: relative;
   z-index: 1;
+  grid-row: 4;
   width: min(calc(100% - 48px), 820px);
   padding: 12px 0 20px;
   margin-inline: auto;

@@ -115,7 +115,7 @@ export default function App() {
   const [content, setContent] = useState("");
   const { state, sendMessage, reconnect } = useChatProtocol(configuration);
   const messages = useMemo(() => displayMessages(state), [state]);
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const conversationRef = useRef<HTMLElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const scalarCount = countUnicodeScalars(content);
   const isReady = state.connection === "ready";
@@ -128,7 +128,14 @@ export default function App() {
   const progress = userAnswerCount >= BRIEF_STAGES.length ? 100 : PROGRESS_BY_STAGE[stageIndex];
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ block: "end" });
+    const conversation = conversationRef.current;
+    if (!conversation) return;
+
+    const frame = window.requestAnimationFrame(() => {
+      conversation.scrollTop = conversation.scrollHeight;
+    });
+
+    return () => window.cancelAnimationFrame(frame);
   }, [messages]);
 
   useEffect(() => {
@@ -272,7 +279,11 @@ export default function App() {
           </div>
         ) : null}
 
-        <section className="conversation" aria-label="Founder interview">
+        <section
+          ref={conversationRef}
+          className="conversation"
+          aria-label="Founder interview"
+        >
           {messages.length === 0 ? (
             <div className="empty-state">
               <div className="pair-orbit" aria-hidden="true"><i /><i /></div>
@@ -326,7 +337,6 @@ export default function App() {
               ))}
             </div>
           )}
-          <div ref={bottomRef} />
         </section>
 
         <div className="composer-wrap">
