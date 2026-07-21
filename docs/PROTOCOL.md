@@ -1,6 +1,21 @@
 # Frontend WebSocket contract
 
-Cofounder Match implements a sequential chat protocol with server-internal tool calls.
+ticket.run implements a sequential chat protocol with server-internal tool calls.
+
+## HTTP upgrade handshake
+
+Before any JSON messages are exchanged, the browser opens the socket with a normalized username and requests the `openai-chat.v1` WebSocket subprotocol:
+
+```ts
+new WebSocket(
+  "wss://example.com/chat?username=alice_123",
+  "openai-chat.v1",
+);
+```
+
+Usernames are lowercased and must match `^[a-z0-9_]{3,32}$`. The frontend stores the normalized value locally and reuses it whenever it creates a replacement socket. The current browser-compatible implementation sends the username through the `username` query parameter; the backend must use the same configured parameter.
+
+This identifies a chat namespace but is not secure authentication. There is no password or ownership proof, so anyone can claim any username.
 
 ## Connection lifecycle
 
@@ -97,4 +112,4 @@ Application `Error` ends an active turn but does not itself prove that the conne
 
 ## Intentionally unsupported
 
-Cofounder Match never sends or expects cancellation, acknowledgement, resume, heartbeat, progress, message IDs, turn IDs, sequence numbers, tool-call events, or batched application messages.
+ticket.run never sends or expects cancellation, acknowledgement, resume, heartbeat, progress, message IDs, turn IDs, sequence numbers, tool-call events, or batched application messages.

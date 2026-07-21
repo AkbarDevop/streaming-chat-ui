@@ -29,6 +29,15 @@ npm install
 npm run dev
 ```
 
+To connect the live backend, open agent settings or provide:
+
+```bash
+VITE_CHAT_WS_URL=wss://example.com
+VITE_CHAT_USERNAME=alice_123
+```
+
+The browser connects to `wss://example.com/chat?username=alice_123` using the `openai-chat.v1` WebSocket subprotocol. Usernames are normalized to lowercase, validated against `^[a-z0-9_]{3,32}$`, and stored locally for reconnects. This is not secure authentication: there is no password and anyone can claim any username.
+
 ## Verification
 
 ```bash
