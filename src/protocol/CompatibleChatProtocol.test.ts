@@ -10,6 +10,7 @@ class FakeWebSocket {
   static instances: FakeWebSocket[] = [];
 
   readonly url: string;
+  readonly protocols: string | string[] | undefined;
   readyState = FakeWebSocket.CONNECTING;
   sent: string[] = [];
   throwOnSend = false;
@@ -19,8 +20,9 @@ class FakeWebSocket {
   onerror: ((event: Event) => void) | null = null;
   onclose: ((event: CloseEvent) => void) | null = null;
 
-  constructor(url: string | URL) {
+  constructor(url: string | URL, protocols?: string | string[]) {
     this.url = String(url);
+    this.protocols = protocols;
     FakeWebSocket.instances.push(this);
   }
 
@@ -63,12 +65,15 @@ describe("CompatibleChatProtocol", () => {
     let latest: ProtocolState | undefined;
     const client = new CompatibleChatProtocol(
       "wss://example.test/chat",
+      "Alice_123",
       DEFAULT_FRAMEWORKS,
       (state) => { latest = state; },
     );
 
     client.connect();
     const socket = FakeWebSocket.instances[0];
+    expect(socket.url).toBe("wss://example.test/chat?username=alice_123");
+    expect(socket.protocols).toBe("openai-chat.v1");
     socket.open();
     expect(socket.sent).toEqual([
       JSON.stringify({ type: "Init", frameworks: DEFAULT_FRAMEWORKS }),
@@ -90,6 +95,7 @@ describe("CompatibleChatProtocol", () => {
   it("does not allow a user turn before History or during another turn", () => {
     const client = new CompatibleChatProtocol(
       "wss://example.test/chat",
+      "alice_123",
       DEFAULT_FRAMEWORKS,
       () => undefined,
     );
@@ -112,6 +118,7 @@ describe("CompatibleChatProtocol", () => {
   it("starts every replacement socket with a fresh Init", () => {
     const client = new CompatibleChatProtocol(
       "wss://example.test/chat",
+      "alice_123",
       DEFAULT_FRAMEWORKS,
       () => undefined,
     );
@@ -134,6 +141,7 @@ describe("CompatibleChatProtocol", () => {
     let latest: ProtocolState | undefined;
     const client = new CompatibleChatProtocol(
       "wss://example.test/chat",
+      "alice_123",
       DEFAULT_FRAMEWORKS,
       (state) => { latest = state; },
     );
@@ -171,6 +179,7 @@ describe("CompatibleChatProtocol", () => {
     let latest: ProtocolState | undefined;
     const client = new CompatibleChatProtocol(
       "wss://example.test/chat",
+      "alice_123",
       DEFAULT_FRAMEWORKS,
       (state) => { latest = state; },
     );
@@ -191,6 +200,7 @@ describe("CompatibleChatProtocol", () => {
     const states: ProtocolState[] = [];
     const client = new CompatibleChatProtocol(
       "wss://example.test/chat",
+      "alice_123",
       DEFAULT_FRAMEWORKS,
       (state) => states.push(state),
     );
@@ -219,6 +229,7 @@ describe("CompatibleChatProtocol", () => {
     let latest: ProtocolState | undefined;
     const client = new CompatibleChatProtocol(
       "wss://example.test/chat",
+      "alice_123",
       DEFAULT_FRAMEWORKS,
       (state) => { latest = state; },
     );

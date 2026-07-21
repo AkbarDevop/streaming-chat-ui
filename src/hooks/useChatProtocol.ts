@@ -11,6 +11,7 @@ import { DEFAULT_FRAMEWORKS } from "../protocol/types";
 export interface ChatConfiguration {
   mode: "demo" | "live";
   url: string;
+  username: string;
 }
 
 export function useChatProtocol(configuration: ChatConfiguration) {
@@ -28,6 +29,7 @@ export function useChatProtocol(configuration: ChatConfiguration) {
         ? new DemoChatProtocol(onState)
         : new CompatibleChatProtocol(
             configuration.url,
+            configuration.username,
             DEFAULT_FRAMEWORKS,
             onState,
           );
@@ -43,6 +45,7 @@ export function useChatProtocol(configuration: ChatConfiguration) {
   }, [
     configuration.mode,
     configuration.url,
+    configuration.username,
   ]);
 
   const sendMessage = useCallback((content: string) => {

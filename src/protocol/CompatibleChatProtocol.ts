@@ -1,4 +1,5 @@
 import { decodeServerMessage, encodeInit, encodeUserMessage, validateUserContent } from "./codec";
+import { buildChatWebSocketUrl, CHAT_SUBPROTOCOL } from "./connection";
 import { createInitialProtocolState, protocolReducer } from "./reducer";
 import type {
   ChatProtocolClient,
@@ -14,6 +15,7 @@ export class CompatibleChatProtocol implements ChatProtocolClient {
 
   constructor(
     private readonly url: string,
+    private readonly username: string,
     private readonly frameworks: Frameworks,
     private readonly onState: (state: ProtocolState) => void,
   ) {}
@@ -23,7 +25,10 @@ export class CompatibleChatProtocol implements ChatProtocolClient {
     const generation = ++this.generation;
 
     this.apply({ type: "CONNECT_STARTED" });
-    const socket = new WebSocket(this.url);
+    const socket = new WebSocket(
+      buildChatWebSocketUrl(this.url, this.username),
+      CHAT_SUBPROTOCOL,
+    );
     this.socket = socket;
 
     socket.onopen = () => {

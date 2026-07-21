@@ -23,7 +23,14 @@ import {
   useChatProtocol,
 } from "./hooks/useChatProtocol";
 import { countUnicodeScalars } from "./protocol/codec";
+import {
+  normalizeUsername,
+  USERNAME_PATTERN,
+  validateUsername,
+} from "./protocol/connection";
 import type { LocalTurn, ProtocolState } from "./protocol/types";
+
+const USERNAME_STORAGE_KEY = "cofounder-match.username";
 
 const STARTING_PATHS = [
   "I’m technical and need a commercial cofounder.",
@@ -50,7 +57,21 @@ interface DisplayMessage {
 
 function createInitialConfiguration(): ChatConfiguration {
   const url = import.meta.env.VITE_CHAT_WS_URL?.trim() ?? "";
-  return { mode: url ? "live" : "demo", url };
+  const environmentUsername = import.meta.env.VITE_CHAT_USERNAME?.trim() ?? "";
+  let storedUsername = "";
+
+  try {
+    storedUsername = window.localStorage.getItem(USERNAME_STORAGE_KEY) ?? "";
+  } catch {
+    // Storage can be unavailable in privacy-restricted browser contexts.
+  }
+
+  const username = normalizeUsername(storedUsername || environmentUsername);
+  return {
+    mode: url && USERNAME_PATTERN.test(username) ? "live" : "demo",
+    url,
+    username,
+  };
 }
 
 function connectionLabel(state: ProtocolState, mode: ChatConfiguration["mode"]) {
@@ -181,12 +202,30 @@ export default function App() {
   const applySettings = (event: FormEvent) => {
     event.preventDefault();
     const url = draftConfiguration.url.trim();
+    let username = normalizeUsername(draftConfiguration.username);
     if (draftConfiguration.mode === "live" && !/^wss?:\/\//i.test(url)) {
       setSettingsError("Enter a WebSocket URL beginning with ws:// or wss://.");
       return;
     }
 
-    const next = { ...draftConfiguration, url };
+    if (draftConfiguration.mode === "live") {
+      try {
+        username = validateUsername(username);
+      } catch (error) {
+        setSettingsError(
+          error instanceof Error ? error.message : "Enter a valid username.",
+        );
+        return;
+      }
+
+      try {
+        window.localStorage.setItem(USERNAME_STORAGE_KEY, username);
+      } catch {
+        // The in-memory value still supports reconnects during this page load.
+      }
+    }
+
+    const next = { ...draftConfiguration, url, username };
     const unchanged = JSON.stringify(next) === JSON.stringify(configuration);
     setSettingsOpen(false);
     setSettingsError("");
@@ -417,16 +456,40 @@ export default function App() {
               </fieldset>
 
               {draftConfiguration.mode === "live" ? (
-                <label className="field">
-                  <span>WebSocket URL</span>
-                  <input
-                    type="url"
-                    value={draftConfiguration.url}
-                    onChange={(event) => setDraftConfiguration((current) => ({ ...current, url: event.target.value }))}
-                    placeholder="wss://api.example.com/session-chat"
-                    autoFocus
-                  />
-                </label>
+                <div className="live-fields">
+                  <label className="field">
+                    <span>Username</span>
+                    <input
+                      type="text"
+                      value={draftConfiguration.username}
+                      onChange={(event) => setDraftConfiguration((current) => ({ ...current, username: event.target.value }))}
+                      placeholder="alice_123"
+                      autoCapitalize="none"
+                      autoCorrect="off"
+                      spellCheck={false}
+                      maxLength={32}
+                      autoFocus
+                    />
+                    <small>Saved on this device · lowercased automatically</small>
+                  </label>
+                  <label className="field">
+                    <span>WebSocket server</span>
+                    <input
+                      type="url"
+                      value={draftConfiguration.url}
+                      onChange={(event) => setDraftConfiguration((current) => ({ ...current, url: event.target.value }))}
+                      placeholder="wss://api.example.com"
+                    />
+                    <small>The client connects to /chat?username=…</small>
+                  </label>
+                  <div className="auth-warning">
+                    <CircleAlert size={16} aria-hidden="true" />
+                    <p>
+                      <strong>Username is not authentication.</strong>
+                      There is no password, so anyone can claim any username.
+                    </p>
+                  </div>
+                </div>
               ) : (
                 <p className="demo-note">
                   Demo mode simulates the founder interview locally. Nothing you type leaves this browser.
