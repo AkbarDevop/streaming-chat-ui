@@ -1,23 +1,27 @@
-# Fieldnote
+# Cofounder Match
 
-A polished, protocol-correct frontend for sequential WebSocket coaching chat. It streams assistant text while keeping tool calls, tool output, and hidden reasoning entirely server-side.
+Your AI agent for finding the person worth building with.
 
-[Open the live demo](https://akbardevop.github.io/streaming-chat-ui/)
+[Open the live product](https://akbardevop.github.io/streaming-chat-ui/) · [Read the product one-pager](docs/PRODUCT.md)
 
-![Fieldnote conversation workspace](output/playwright/desktop-empty.png)
+![Cofounder Match founder interview](output/playwright/desktop-empty.png)
 
-## What it includes
+## The product
 
-- Exact `Init` → `History` → `UserMessage` → `AssistantDelta*` → `AssistantDone` flow
-- One active turn at a time, with send controls locked during generation
-- Authoritative `AssistantDone.content` replacement—never duplicated delta text
-- Strict server-message decoder and 32,000 Unicode-scalar client limit
-- Reconnection through a fresh socket and fresh `History` snapshot
-- Stale-socket callback protection and explicit uncertain-turn state
-- All four configurable coaching/teaching framework fields
-- Responsive, accessible desktop and mobile interface
-- Built-in demo stream for UI evaluation without a backend
-- 19 protocol regression tests and automated GitHub Pages deployment
+Most cofounder platforms give founders another directory to browse. Cofounder Match conducts a real founder interview, builds a structured brief, searches the candidate pool, and returns one high-signal introduction with a clear explanation of the fit and risks.
+
+The frontend presents one simple conversation. The matching harness can privately coordinate profile analysis, complementarity scoring, compatibility red-teaming, scheduling, and trial-sprint design without exposing tool calls or internal reasoning.
+
+## Current experience
+
+- Four-stage founder brief: profile, build thesis, match criteria, and review
+- Conversational onboarding focused on proof, commitment, gaps, pace, and working style
+- Visible progress without turning the interview into a form
+- Private-by-default product language and controls
+- Built-in cofounder interview demo that works without a backend
+- Configurable live WebSocket connection for the real matching harness
+- Responsive desktop and mobile UI
+- Protocol-correct streaming with 19 regression tests
 
 ## Quick start
 
@@ -26,42 +30,29 @@ npm install
 npm run dev
 ```
 
-Fieldnote starts in demo mode when no endpoint is configured. Open **Connection settings** to switch to a real socket at runtime.
-
-To start in live mode, create `.env.local`:
+The app starts with its local demo agent. Open **Agent settings** to connect a real WebSocket at runtime, or create `.env.local`:
 
 ```bash
 VITE_CHAT_WS_URL=wss://your-api.example.com/session-chat
 ```
 
-Then restart the development server. The browser sends exactly one `Init` after the socket opens and enables the composer only after `History` arrives.
+## Agent experience
 
-## Protocol behavior
-
-The client emits only these message shapes:
-
-```json
-{
-  "type": "Init",
-  "frameworks": {
-    "coaching_cycle": "impact-cycle",
-    "coaching_conversation": "grow",
-    "teaching_framework": "class",
-    "continuous_improvement": "plc"
-  }
-}
+```text
+founder interview
+      ↓
+structured founder brief
+      ↓
+private specialist-agent harness
+      ↓
+one explained match
+      ↓
+introduction + trial sprint
+      ↓
+feedback improves the next match
 ```
 
-```json
-{
-  "type": "UserMessage",
-  "content": "What patterns can you identify?"
-}
-```
-
-It accepts `History`, `AssistantDelta`, `AssistantDone`, and `Error`. Tool calls produce no client-visible event, so the UI remains in `awaiting-response` until a delta, terminal message, error, or connection loss arrives.
-
-See [docs/PROTOCOL.md](docs/PROTOCOL.md) for the frontend contract and recovery rules.
+The existing wire contract requires a legacy framework object during `Init`; the UI supplies it internally and never exposes those backend-specific fields to founders. See [docs/PROTOCOL.md](docs/PROTOCOL.md) for the exact transport behavior.
 
 ## Project layout
 
@@ -72,10 +63,10 @@ src/
 │   ├── codec.ts                     Wire encoders, decoder, scalar validation
 │   ├── reducer.ts                   Connection and turn state machines
 │   ├── CompatibleChatProtocol.ts    Real WebSocket manager
-│   ├── DemoChatProtocol.ts          Local protocol simulator
+│   ├── DemoChatProtocol.ts          Cofounder interview simulator
 │   └── *.test.ts                    Regression suite
-├── App.tsx                          Product UI and session configuration
-└── styles.css                       Responsive visual system and motion
+├── App.tsx                          Founder interview and agent settings
+└── styles.css                       Responsive product system and motion
 ```
 
 ## Commands
@@ -90,16 +81,14 @@ npm run preview    # serve the production bundle
 
 ## Deployment
 
-The live site is served from the `gh-pages` branch. To publish the current production build manually:
+The live site is served from the `gh-pages` branch:
 
 ```bash
 npm run build
 npx gh-pages --dist dist --nojekyll
 ```
 
-The included CI and deployment workflows can run the same verification and publish flow from GitHub Actions. The Vite build uses relative asset paths, so it works under a repository subpath.
-
-For a live backend, either set `VITE_CHAT_WS_URL` during the build or enter the endpoint in the deployed app. Your WebSocket server must accept connections from the deployed page’s origin.
+The included manual workflows run the same verification and deployment flow through GitHub Actions when hosted runners are available.
 
 ## License
 

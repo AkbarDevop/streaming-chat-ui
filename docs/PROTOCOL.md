@@ -1,6 +1,6 @@
 # Frontend WebSocket contract
 
-Fieldnote implements a sequential chat protocol with server-internal tool calls.
+Cofounder Match implements a sequential chat protocol with server-internal tool calls.
 
 ## Connection lifecycle
 
@@ -97,4 +97,4 @@ Application `Error` ends an active turn but does not itself prove that the conne
 
 ## Intentionally unsupported
 
-Fieldnote never sends or expects cancellation, acknowledgement, resume, heartbeat, progress, message IDs, turn IDs, sequence numbers, tool-call events, or batched application messages.
+Cofounder Match never sends or expects cancellation, acknowledgement, resume, heartbeat, progress, message IDs, turn IDs, sequence numbers, tool-call events, or batched application messages.

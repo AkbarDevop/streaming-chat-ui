@@ -4,14 +4,13 @@ import { DemoChatProtocol } from "../protocol/DemoChatProtocol";
 import { createInitialProtocolState } from "../protocol/reducer";
 import type {
   ChatProtocolClient,
-  Frameworks,
   ProtocolState,
 } from "../protocol/types";
+import { DEFAULT_FRAMEWORKS } from "../protocol/types";
 
 export interface ChatConfiguration {
   mode: "demo" | "live";
   url: string;
-  frameworks: Frameworks;
 }
 
 export function useChatProtocol(configuration: ChatConfiguration) {
@@ -26,10 +25,10 @@ export function useChatProtocol(configuration: ChatConfiguration) {
 
     const client: ChatProtocolClient =
       configuration.mode === "demo"
-        ? new DemoChatProtocol(configuration.frameworks, onState)
+        ? new DemoChatProtocol(onState)
         : new CompatibleChatProtocol(
             configuration.url,
-            configuration.frameworks,
+            DEFAULT_FRAMEWORKS,
             onState,
           );
 
@@ -42,10 +41,6 @@ export function useChatProtocol(configuration: ChatConfiguration) {
       client.disconnect();
     };
   }, [
-    configuration.frameworks.coaching_conversation,
-    configuration.frameworks.coaching_cycle,
-    configuration.frameworks.continuous_improvement,
-    configuration.frameworks.teaching_framework,
     configuration.mode,
     configuration.url,
   ]);
