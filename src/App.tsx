@@ -1,506 +1,561 @@
 import {
-  ArrowUpRight,
+  ArrowUp,
   Check,
-  ChevronDown,
-  CircleDot,
+  ChevronRight,
+  CircleAlert,
   Clock3,
-  Command,
   GitBranch,
-  GitFork,
-  Hash,
-  Search,
+  GitPullRequest,
+  LockKeyhole,
+  Play,
+  Radio,
+  RotateCw,
+  Settings2,
   ShieldCheck,
   Sparkles,
   Terminal,
-  Zap,
+  X,
 } from "lucide-react";
-import { type CSSProperties, useEffect, useMemo, useRef, useState } from "react";
+import {
+  type FormEvent,
+  type KeyboardEvent,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import {
+  type ChatConfiguration,
+  useChatProtocol,
+} from "./hooks/useChatProtocol";
+import { countUnicodeScalars } from "./protocol/codec";
+import type { LocalTurn, ProtocolState } from "./protocol/types";
 
-type StackFilter = "all" | "typescript" | "python" | "rust" | "go";
+const STARTING_PROMPTS = [
+  "Find me a TypeScript ticket I can ship this weekend.",
+  "I want backend infrastructure work with real maintainers.",
+  "Match me with a paid Python open-source issue.",
+];
 
-interface Ticket {
+const MATCH_STAGES = [
+  { title: "Work signal", detail: "What you want to ship" },
+  { title: "Proof + time", detail: "What you can credibly own" },
+  { title: "One match", detail: "A ticket worth starting" },
+];
+
+interface TicketMatch {
   id: string;
   repo: string;
   issue: number;
   title: string;
-  language: Exclude<StackFilter, "all">;
-  bounty: number;
-  match: number;
-  difficulty: "medium" | "hard" | "expert";
+  language: string;
+  bounty: string;
+  fit: number;
   estimate: string;
-  updated: string;
-  maintainers: string;
-  mergeRate: number;
-  responseTime: string;
-  labels: string[];
-  summary: string;
-  scope: string[];
-  signals: string[];
-  files: string[];
   branch: string;
+  reason: string[];
   risk: string;
 }
 
-const STACKS: { id: StackFilter; label: string }[] = [
-  { id: "all", label: "all" },
-  { id: "typescript", label: "ts" },
-  { id: "python", label: "py" },
-  { id: "rust", label: "rs" },
-  { id: "go", label: "go" },
-];
-
-const TICKETS: Ticket[] = [
-  {
+const TICKET_MATCHES: Record<string, TicketMatch> = {
+  "cal-16841": {
     id: "cal-16841",
     repo: "calcom/cal.com",
     issue: 16841,
     title: "Timezone-aware recurring availability overrides",
-    language: "typescript",
-    bounty: 1200,
-    match: 96,
-    difficulty: "hard",
+    language: "TypeScript",
+    bounty: "$1,200",
+    fit: 96,
     estimate: "6–9h",
-    updated: "18m",
-    maintainers: "responsive",
-    mergeRate: 84,
-    responseTime: "3.2h",
-    labels: ["feature", "scheduling", "paid"],
-    summary:
-      "Recurring schedules currently inherit the organizer timezone after an override. Add explicit timezone ownership without changing existing availability behavior.",
-    scope: [
-      "Add timezone to recurring override schema",
-      "Preserve legacy records through the migration",
-      "Cover DST boundaries in availability tests",
-    ],
-    signals: [
-      "You shipped date-heavy TypeScript code in 3 public repos",
-      "Your merged PRs touch Prisma migrations and scheduling logic",
-      "The maintainer usually reviews first submissions within one day",
-    ],
-    files: ["packages/prisma/schema.prisma", "packages/lib/availability.ts", "apps/web/test/availability.test.ts"],
     branch: "feat/recurring-timezones",
-    risk: "DST fixtures are incomplete. Budget one hour to establish expected edge behavior before implementation.",
+    reason: [
+      "Your public work includes date-heavy TypeScript",
+      "The patch touches scheduling and Prisma boundaries you have shipped before",
+      "Maintainers usually review a focused first patch within one day",
+    ],
+    risk: "DST fixtures are incomplete. Establish the expected edge behavior before implementation.",
   },
-  {
-    id: "astral-9127",
+  "ruff-9127": {
+    id: "ruff-9127",
     repo: "astral-sh/ruff",
     issue: 9127,
     title: "Preserve formatter comments around nested match guards",
-    language: "rust",
-    bounty: 850,
-    match: 91,
-    difficulty: "expert",
+    language: "Rust",
+    bounty: "$850",
+    fit: 91,
     estimate: "8–12h",
-    updated: "42m",
-    maintainers: "active",
-    mergeRate: 79,
-    responseTime: "5.7h",
-    labels: ["formatter", "python", "bounty"],
-    summary:
-      "Comments attached to nested Python match guards can move after formatting. Retain stable placement across repeated formatter passes.",
-    scope: [
-      "Reproduce the nested guard comment drift",
-      "Update comment attachment in the formatter AST",
-      "Add idempotency fixtures for three nesting levels",
-    ],
-    signals: [
-      "Your Rust parser work maps to this formatter boundary",
-      "You have recent Python AST experience",
-      "This repo merges focused fixtures before implementation changes",
-    ],
-    files: ["crates/ruff_python_formatter/src/comments.rs", "crates/ruff_python_formatter/tests/fixtures.rs"],
     branch: "fix/match-guard-comments",
-    risk: "The visible bug is small, but comment ownership crosses two AST nodes. Expect maintainer guidance.",
+    reason: [
+      "Your parser work maps to this formatter boundary",
+      "The issue has a maintainer-confirmed reproduction",
+      "Your available block is large enough for the fixture work",
+    ],
+    risk: "Comment ownership crosses two AST nodes, so expect one maintainer design check.",
   },
-  {
+  "pydantic-10422": {
     id: "pydantic-10422",
     repo: "pydantic/pydantic",
     issue: 10422,
     title: "Expose validation trace for discriminated unions",
-    language: "python",
-    bounty: 640,
-    match: 88,
-    difficulty: "medium",
+    language: "Python",
+    bounty: "$640",
+    fit: 88,
     estimate: "4–6h",
-    updated: "1h",
-    maintainers: "responsive",
-    mergeRate: 87,
-    responseTime: "2.4h",
-    labels: ["diagnostics", "v2", "good scope"],
-    summary:
-      "Add an opt-in trace explaining which discriminator branches were considered when a union fails validation.",
-    scope: [
-      "Define a stable trace result shape",
-      "Expose branch decisions behind an opt-in flag",
-      "Add JSON and Python-mode examples",
-    ],
-    signals: [
+    branch: "feat/union-validation-trace",
+    reason: [
       "Your API tooling work includes structured error surfaces",
-      "The issue fits your available five-hour block",
+      "The issue fits a single focused work session",
       "Acceptance criteria are complete and maintainer-confirmed",
     ],
-    files: ["pydantic/type_adapter.py", "pydantic_core/core_schema.py", "tests/test_discriminated_union.py"],
-    branch: "feat/union-validation-trace",
-    risk: "Public API shape needs maintainer approval before implementation. Start with a typed proposal.",
+    risk: "Get approval on the public trace shape before writing the implementation.",
   },
-  {
+  "temporal-1732": {
     id: "temporal-1732",
     repo: "temporalio/sdk-go",
     issue: 1732,
     title: "Worker health signal for sticky queue starvation",
-    language: "go",
-    bounty: 1500,
-    match: 86,
-    difficulty: "hard",
+    language: "Go",
+    bounty: "$1,500",
+    fit: 86,
     estimate: "10–14h",
-    updated: "2h",
-    maintainers: "active",
-    mergeRate: 81,
-    responseTime: "6.1h",
-    labels: ["worker", "observability", "paid"],
-    summary:
-      "Expose a worker health signal when sticky task queues remain backlogged while pollers appear healthy.",
-    scope: [
-      "Track sticky queue starvation independently",
-      "Surface a non-breaking worker diagnostic",
-      "Simulate poller health with a stalled sticky queue",
-    ],
-    signals: [
-      "Your distributed worker project matches the queue model",
-      "You have production observability commits",
-      "The bounty reflects a deeper test harness requirement",
-    ],
-    files: ["internal/internal_worker.go", "internal/common/metrics.go", "test/worker_test.go"],
     branch: "feat/sticky-queue-health",
-    risk: "The integration test may be timing-sensitive. Validate the deterministic harness before changing worker code.",
+    reason: [
+      "Your distributed worker work maps to the queue model",
+      "You have production observability proof",
+      "The maintainer has already narrowed the diagnostic surface",
+    ],
+    risk: "Validate the deterministic test harness before changing worker code.",
   },
-  {
+  "plane-6234": {
     id: "plane-6234",
     repo: "makeplane/plane",
     issue: 6234,
     title: "Bulk move cycles without losing issue ordering",
-    language: "typescript",
-    bounty: 420,
-    match: 82,
-    difficulty: "medium",
+    language: "TypeScript / React",
+    bounty: "$420",
+    fit: 82,
     estimate: "3–5h",
-    updated: "4h",
-    maintainers: "active",
-    mergeRate: 72,
-    responseTime: "8.8h",
-    labels: ["frontend", "state", "bounty"],
-    summary:
-      "Bulk cycle moves currently reset the manual ordering of affected issues. Preserve relative position across optimistic updates.",
-    scope: [
-      "Capture relative ordering before the mutation",
-      "Apply a stable optimistic reorder",
-      "Add rollback coverage for failed moves",
-    ],
-    signals: [
-      "Your React state work is directly relevant",
-      "The change is isolated to one product surface",
-      "A maintainer supplied a failing reproduction",
-    ],
-    files: ["apps/web/store/cycle.store.ts", "apps/web/hooks/use-cycle-issues.ts"],
     branch: "fix/stable-cycle-move",
-    risk: "Ordering is duplicated in client and API responses. Keep the patch client-side unless the reproduction proves otherwise.",
+    reason: [
+      "Your React state work is directly relevant",
+      "The patch is isolated to one product surface",
+      "A maintainer supplied the failing reproduction",
+    ],
+    risk: "Ordering exists in both client and API responses. Keep the first patch client-side.",
   },
-];
+};
 
-function money(value: number): string {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: 0,
-  }).format(value);
+interface DisplayMessage {
+  key: string;
+  role: "user" | "assistant";
+  content: string;
+  status?: LocalTurn["status"];
+  errorCode?: string;
+}
+
+function createInitialConfiguration(): ChatConfiguration {
+  const url = import.meta.env.VITE_CHAT_WS_URL?.trim() ?? "";
+  return { mode: url ? "live" : "demo", url };
+}
+
+function connectionLabel(state: ProtocolState, mode: ChatConfiguration["mode"]): string {
+  if (state.connection === "ready") return mode === "demo" ? "Demo agent" : "Agent online";
+  if (state.connection === "connecting") return "Booting agent";
+  if (state.connection === "awaiting-history") return "Syncing thread";
+  return "Offline";
+}
+
+function displayMessages(state: ProtocolState): DisplayMessage[] {
+  const messages: DisplayMessage[] = state.history.map((item, index) => ({
+    key: `history-${index}`,
+    role: item.role,
+    content: item.content,
+  }));
+
+  for (const turn of state.localTurns) {
+    messages.push({
+      key: `local-${turn.sequence}-user`,
+      role: "user",
+      content: turn.userContent,
+    });
+    messages.push({
+      key: `local-${turn.sequence}-assistant`,
+      role: "assistant",
+      content: turn.assistantContent,
+      status: turn.status,
+      errorCode: turn.errorCode,
+    });
+  }
+
+  return messages;
+}
+
+function matchIdFromContent(content: string): string | null {
+  return content.match(/\[\[ticket:([a-z0-9-]+)\]\]/i)?.[1] ?? null;
+}
+
+function visibleAssistantContent(content: string): string {
+  return content
+    .replace(/\[\[ticket:[a-z0-9-]+\]\]/gi, "")
+    .replace(/\[\[[^\]]*$/g, "")
+    .trim();
+}
+
+function MessageStatus({ message }: { message: DisplayMessage }) {
+  if (message.status === "incomplete") {
+    return <span className="message-note">Response ended before completion</span>;
+  }
+  if (message.status === "failed") {
+    return (
+      <span className="message-note message-note--error">
+        Agent stopped{message.errorCode ? ` · ${message.errorCode}` : ""}
+      </span>
+    );
+  }
+  if (message.status === "unresolved") {
+    return (
+      <span className="message-note message-note--error">
+        Connection lost · outcome uncertain
+      </span>
+    );
+  }
+  return null;
+}
+
+function MatchResult({
+  match,
+  claimed,
+  onClaim,
+}: {
+  match: TicketMatch;
+  claimed: boolean;
+  onClaim: () => void;
+}) {
+  return (
+    <section className={`match-result${claimed ? " match-result--claimed" : ""}`}>
+      <div className="match-result__signal">
+        <span><Sparkles size={14} aria-hidden="true" /> one match found</span>
+        <strong>{match.fit}% fit</strong>
+      </div>
+
+      <div className="match-result__title">
+        <div>
+          <span>{match.repo} / #{match.issue}</span>
+          <h3>{match.title}</h3>
+        </div>
+        <div className="match-score" aria-label={`${match.fit}% match score`}>
+          <strong>{match.fit}</strong>
+          <span>/100</span>
+        </div>
+      </div>
+
+      <div className="match-meta">
+        <span><Terminal size={13} />{match.language}</span>
+        <span><Clock3 size={13} />{match.estimate}</span>
+        <span><ShieldCheck size={13} />{match.bounty} verified</span>
+      </div>
+
+      <div className="match-reasons">
+        <span>why the agent picked this</span>
+        <ol>
+          {match.reason.map((reason) => <li key={reason}>{reason}</li>)}
+        </ol>
+      </div>
+
+      <div className="match-risk">
+        <span>preflight</span>
+        <p>{match.risk}</p>
+      </div>
+
+      <div className="match-result__footer">
+        <code><GitBranch size={13} />{match.branch}</code>
+        <button type="button" onClick={onClaim}>
+          {claimed ? <><Check size={15} /> Run started</> : <><GitPullRequest size={15} /> Start this ticket</>}
+        </button>
+      </div>
+
+      {claimed ? (
+        <div className="run-receipt" aria-live="polite">
+          <i /> run initialized · scope check and branch instructions ready
+        </div>
+      ) : null}
+    </section>
+  );
 }
 
 export default function App() {
-  const [stack, setStack] = useState<StackFilter>("all");
-  const [query, setQuery] = useState("");
-  const [selectedId, setSelectedId] = useState(TICKETS[0].id);
-  const [claimedId, setClaimedId] = useState<string | null>(null);
-  const searchRef = useRef<HTMLInputElement>(null);
-
-  const visibleTickets = useMemo(() => {
-    const normalized = query.trim().toLowerCase();
-    return TICKETS.filter((ticket) => {
-      const stackMatches = stack === "all" || ticket.language === stack;
-      const queryMatches =
-        !normalized ||
-        `${ticket.repo} ${ticket.title} ${ticket.labels.join(" ")}`
-          .toLowerCase()
-          .includes(normalized);
-      return stackMatches && queryMatches;
-    });
-  }, [query, stack]);
-
-  const selected =
-    TICKETS.find((ticket) => ticket.id === selectedId) ?? visibleTickets[0] ?? TICKETS[0];
-  const isClaimed = claimedId === selected.id;
+  const [configuration, setConfiguration] = useState(createInitialConfiguration);
+  const [draftConfiguration, setDraftConfiguration] = useState(configuration);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsError, setSettingsError] = useState("");
+  const [composerError, setComposerError] = useState("");
+  const [content, setContent] = useState("");
+  const [claimedMatchId, setClaimedMatchId] = useState<string | null>(null);
+  const { state, sendMessage, reconnect } = useChatProtocol(configuration);
+  const messages = useMemo(() => displayMessages(state), [state]);
+  const conversationRef = useRef<HTMLElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const scalarCount = countUnicodeScalars(content);
+  const isReady = state.connection === "ready";
+  const isActive = state.activeTurn !== null;
+  const canSend = isReady && !isActive && content.trim().length > 0 && scalarCount <= 32_000;
+  const userAnswerCount =
+    state.history.filter((item) => item.role === "user").length + state.localTurns.length;
+  const currentMatchId = messages.reduce<string | null>(
+    (latest, message) => matchIdFromContent(message.content) ?? latest,
+    null,
+  );
+  const stageIndex = currentMatchId ? 2 : Math.min(userAnswerCount, 1);
 
   useEffect(() => {
-    const handleKeyDown = (event: globalThis.KeyboardEvent) => {
-      if (event.key === "/" && document.activeElement !== searchRef.current) {
-        event.preventDefault();
-        searchRef.current?.focus();
-      }
+    const conversation = conversationRef.current;
+    if (!conversation) return;
+    const frame = window.requestAnimationFrame(() => {
+      conversation.scrollTop = conversation.scrollHeight;
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [messages, claimedMatchId]);
+
+  useEffect(() => {
+    if (!settingsOpen) return;
+    const onKeyDown = (event: globalThis.KeyboardEvent) => {
+      if (event.key === "Escape") setSettingsOpen(false);
     };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [settingsOpen]);
 
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, []);
+  const submitMessage = (message: string) => {
+    const trimmed = message.trim();
+    if (!trimmed) return;
+    try {
+      sendMessage(trimmed);
+      setContent("");
+      setComposerError("");
+      window.requestAnimationFrame(() => textareaRef.current?.focus());
+    } catch (error) {
+      setComposerError(error instanceof Error ? error.message : "Could not send message");
+    }
+  };
 
-  const selectTicket = (ticket: Ticket) => {
-    setSelectedId(ticket.id);
+  const onSubmit = (event: FormEvent) => {
+    event.preventDefault();
+    if (canSend) submitMessage(content);
+  };
+
+  const onComposerKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key === "Enter" && !event.shiftKey) {
+      event.preventDefault();
+      if (canSend) submitMessage(content);
+    }
+  };
+
+  const openSettings = () => {
+    setDraftConfiguration(configuration);
+    setSettingsError("");
+    setSettingsOpen(true);
+  };
+
+  const applySettings = (event: FormEvent) => {
+    event.preventDefault();
+    const url = draftConfiguration.url.trim();
+    if (draftConfiguration.mode === "live" && !/^wss?:\/\//i.test(url)) {
+      setSettingsError("Enter a WebSocket URL beginning with ws:// or wss://.");
+      return;
+    }
+
+    const next = { ...draftConfiguration, url };
+    const unchanged = JSON.stringify(next) === JSON.stringify(configuration);
+    setSettingsOpen(false);
+    setSettingsError("");
+    setClaimedMatchId(null);
+    if (unchanged) reconnect();
+    else setConfiguration(next);
   };
 
   return (
-    <div className="app-frame">
-      <header className="topbar">
-        <a className="wordmark" href="#queue" aria-label="ticket.run home">
-          <span className="wordmark-mark"><i /><i /><i /></span>
+    <div className="app-shell">
+      <aside className="brief-rail">
+        <a className="brand-lockup" href="#match" aria-label="ticket.run home">
+          <span className="brand-prompt" aria-hidden="true">&gt;_</span>
           <strong>ticket.run</strong>
-          <small>alpha_04</small>
+          <span>alpha</span>
         </a>
 
-        <nav className="topnav" aria-label="Primary navigation">
-          <a className="active" href="#queue">match queue <span>05</span></a>
-          <a href="#active">active run <span>{claimedId ? "01" : "00"}</span></a>
-          <a href="#profile">proof graph</a>
-        </nav>
-
-        <div className="top-actions">
-          <span className="index-status"><i /> index live</span>
-          <button className="command-button" type="button" onClick={() => searchRef.current?.focus()}>
-            <Command size={13} aria-hidden="true" /> K
-          </button>
-          <button className="avatar" type="button" aria-label="Open engineer profile">AK</button>
+        <div className="rail-thesis">
+          <span>private match agent</span>
+          <h2>One ticket.<br />Not another feed.</h2>
         </div>
-      </header>
 
-      <div className="workbench">
-        <aside className="queue-panel" id="queue">
-          <div className="panel-heading">
-            <div>
-              <span className="kicker">01 / opportunity index</span>
-              <h1>Open tickets</h1>
-            </div>
-            <span className="queue-count">1,284 indexed</span>
-          </div>
-
-          <label className="search-field">
-            <Search size={15} aria-hidden="true" />
-            <input
-              ref={searchRef}
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="filter repo, label, issue…"
-              aria-label="Filter ticket queue"
-            />
-            <kbd>/</kbd>
-          </label>
-
-          <div className="stack-filter" aria-label="Filter by language">
-            {STACKS.map((item) => (
-              <button
-                key={item.id}
-                className={stack === item.id ? "active" : ""}
-                type="button"
-                onClick={() => setStack(item.id)}
-              >
-                {item.label}
-              </button>
-            ))}
-            <button className="filter-more" type="button" aria-label="More filters">
-              <ChevronDown size={13} />
-            </button>
-          </div>
-
-          <div className="ticket-list" aria-live="polite">
-            {visibleTickets.length ? (
-              visibleTickets.map((ticket, index) => (
-                <button
-                  key={ticket.id}
-                  type="button"
-                  className={`ticket-row ${selected.id === ticket.id ? "selected" : ""}`}
-                  onClick={() => selectTicket(ticket)}
-                >
-                  <span className="ticket-index">{String(index + 1).padStart(2, "0")}</span>
-                  <span className="ticket-copy">
-                    <span className="repo-line">
-                      <span>{ticket.repo}</span>
-                      <small>#{ticket.issue}</small>
-                    </span>
-                    <strong>{ticket.title}</strong>
-                    <span className="ticket-meta">
-                      <span>{ticket.language}</span>
-                      <span>{ticket.estimate}</span>
-                      <span>updated {ticket.updated}</span>
-                    </span>
-                  </span>
-                  <span className="ticket-value">
-                    <strong>{ticket.match}%</strong>
-                    <small>{money(ticket.bounty)}</small>
-                  </span>
-                </button>
-              ))
-            ) : (
-              <div className="no-results">
-                <Terminal size={18} />
-                <strong>no clean matches</strong>
-                <span>clear filters or widen the stack</span>
-              </div>
-            )}
-          </div>
-
-          <div className="queue-footer">
-            <span><Sparkles size={13} /> ranked against 47 proof signals</span>
-            <button type="button">refresh index</button>
-          </div>
-        </aside>
-
-        <main className="ticket-workspace">
-          <div className="issue-path">
-            <span>match/{selected.language}</span>
-            <span>/</span>
-            <strong>{selected.repo}</strong>
-            <span>/</span>
-            <strong>#{selected.issue}</strong>
-          </div>
-
-          <section className="issue-hero">
-            <div className="issue-title-block">
-              <div className="label-line">
-                <span className="verified"><ShieldCheck size={13} /> scoped ticket</span>
-                <span>{selected.difficulty}</span>
-                <span>{selected.estimate}</span>
-              </div>
-              <h2>{selected.title}</h2>
-              <div className="label-set">
-                {selected.labels.map((label) => <span key={label}>#{label}</span>)}
-              </div>
-            </div>
-
-            <div className="match-score" key={selected.id}>
-              <span>fit score</span>
-              <strong>{selected.match}<small>%</small></strong>
-              <i style={{ "--score": `${selected.match * 3.6}deg` } as CSSProperties} />
-            </div>
-          </section>
-
-          <section className="issue-brief">
-            <span className="section-number">02</span>
-            <div className="section-copy">
-              <span className="kicker">ticket brief</span>
-              <p>{selected.summary}</p>
-            </div>
-          </section>
-
-          <section className="scope-grid">
-            <div className="scope-column">
-              <div className="section-label"><Hash size={13} /> expected patch</div>
-              <ol>
-                {selected.scope.map((item, index) => (
-                  <li key={item}><span>0{index + 1}</span>{item}</li>
-                ))}
-              </ol>
-            </div>
-            <div className="scope-column files-column">
-              <div className="section-label"><GitBranch size={13} /> likely surface</div>
-              <ul>
-                {selected.files.map((file) => <li key={file}>{file}</li>)}
-              </ul>
-              <div className="branch-line"><span>branch</span><code>{selected.branch}</code></div>
-            </div>
-          </section>
-
-          <section className="risk-line">
-            <span><Zap size={14} /> preflight note</span>
-            <p>{selected.risk}</p>
-          </section>
-
-          <section className={`run-console ${isClaimed ? "active" : ""}`} id="active">
-            <div className="console-head">
-              <span><CircleDot size={12} /> {isClaimed ? "run initialized" : "ready to claim"}</span>
-              <code>{isClaimed ? `run_${selected.issue}_ak` : "awaiting engineer"}</code>
-            </div>
-            {isClaimed ? (
-              <div className="console-body">
-                <p><span>00:00</span> ticket locked for 24 hours</p>
-                <p><span>00:01</span> fork and branch instructions generated</p>
-                <p><span>00:01</span> maintainer notified, preflight pending<span className="cursor" /></p>
-              </div>
-            ) : (
-              <div className="console-idle">
-                Claiming opens a private run, notifies the maintainer, and starts your merge clock.
-              </div>
-            )}
-          </section>
-
-          <div className="claim-bar">
-            <div>
-              <span className="kicker">verified bounty</span>
-              <strong>{money(selected.bounty)}</strong>
-              <small>paid after merge</small>
-            </div>
-            <button
-              className={isClaimed ? "claimed" : ""}
-              type="button"
-              onClick={() => setClaimedId(isClaimed ? null : selected.id)}
+        <ol className="match-stages" aria-label="Match progress">
+          {MATCH_STAGES.map((stage, index) => (
+            <li
+              key={stage.title}
+              className={index < stageIndex ? "complete" : index === stageIndex ? "active" : ""}
             >
-              {isClaimed ? <><Check size={17} /> ticket claimed</> : <>claim this ticket <ArrowUpRight size={17} /></>}
+              <span className="stage-index">
+                {index < stageIndex ? <Check size={12} aria-label="Complete" /> : `0${index + 1}`}
+              </span>
+              <div>
+                <strong>{stage.title}</strong>
+                <span>{stage.detail}</span>
+              </div>
+            </li>
+          ))}
+        </ol>
+
+        <div className="rail-footer">
+          <LockKeyhole size={15} aria-hidden="true" />
+          <div>
+            <strong>Search happens privately</strong>
+            <span>No tool calls or ranking noise in your thread.</span>
+          </div>
+        </div>
+      </aside>
+
+      <main className="workspace" id="match">
+        <header className="workspace-header">
+          <div>
+            <span className="eyebrow">engineer ↔ open ticket</span>
+            <h1>{MATCH_STAGES[stageIndex].title}</h1>
+          </div>
+          <div className="header-actions">
+            <span className={`connection-status connection-status--${state.connection}`}>
+              <i />{connectionLabel(state, configuration.mode)}
+            </span>
+            {state.connection === "disconnected" ? (
+              <button className="text-button" type="button" onClick={reconnect}>
+                <RotateCw size={14} /> Reconnect
+              </button>
+            ) : null}
+            <button className="icon-button" type="button" onClick={openSettings} aria-label="Open agent settings">
+              <Settings2 size={18} />
             </button>
           </div>
-        </main>
+        </header>
 
-        <aside className="proof-panel" id="profile">
-          <div className="profile-head">
-            <div className="profile-avatar">AK</div>
-            <div>
-              <span className="kicker">engineer proof graph</span>
-              <strong>akbar@local</strong>
-              <small><i /> synced 7m ago</small>
+        {state.lastError ? (
+          <div className="error-banner" role="alert">
+            <CircleAlert size={16} />
+            <span><strong>{state.lastError.code}</strong>{state.lastError.message}</span>
+          </div>
+        ) : null}
+
+        <section ref={conversationRef} className="conversation" aria-label="Ticket matching conversation">
+          {messages.length === 0 ? (
+            <div className="empty-state">
+              <div className="agent-glyph" aria-hidden="true"><i /><span>&gt;_</span></div>
+              <span className="empty-kicker">private ticket matcher</span>
+              <h2>Tell me what you want to ship.</h2>
+              <p>
+                I’ll use your proof, available time, and maintainer behavior to return one open ticket worth starting.
+              </p>
+              <div className="prompt-list" aria-label="Starting prompts">
+                {STARTING_PROMPTS.map((prompt, index) => (
+                  <button key={prompt} type="button" onClick={() => submitMessage(prompt)} disabled={!isReady || isActive}>
+                    <span>0{index + 1}</span>
+                    {prompt}
+                    <ChevronRight size={16} />
+                  </button>
+                ))}
+              </div>
             </div>
-            <GitFork size={18} aria-label="GitHub connected" />
+          ) : (
+            <div className="message-list" aria-live="polite">
+              {messages.map((message) => {
+                const matchId = matchIdFromContent(message.content);
+                const match = matchId ? TICKET_MATCHES[matchId] : null;
+                const visibleContent = message.role === "assistant"
+                  ? visibleAssistantContent(message.content)
+                  : message.content;
+
+                return (
+                  <article className={`message message--${message.role}`} key={message.key}>
+                    <div className="message-label">
+                      <span>{message.role === "assistant" ? "Match agent" : "You"}</span>
+                      {message.role === "assistant" && message.status === "completed" ? <Check size={12} /> : null}
+                    </div>
+                    {message.role === "assistant" && message.status === "active" && !visibleContent ? (
+                      <div className="thinking" aria-label="Match agent is thinking">
+                        <i /><i /><i /><span>Searching quietly</span>
+                      </div>
+                    ) : (
+                      <div className="message-content">
+                        {visibleContent.split("\n").map((line, index) =>
+                          line ? <p key={`${message.key}-${index}`}>{line}</p> : <br key={`${message.key}-${index}`} />,
+                        )}
+                        {message.role === "assistant" && message.status === "active" ? <span className="stream-cursor" /> : null}
+                      </div>
+                    )}
+                    {match ? (
+                      <MatchResult
+                        match={match}
+                        claimed={claimedMatchId === match.id}
+                        onClaim={() => setClaimedMatchId(match.id)}
+                      />
+                    ) : null}
+                    <MessageStatus message={message} />
+                  </article>
+                );
+              })}
+            </div>
+          )}
+        </section>
+
+        <div className="composer-wrap">
+          <form className="composer" onSubmit={onSubmit}>
+            <span className="composer-prompt" aria-hidden="true">&gt;</span>
+            <textarea
+              ref={textareaRef}
+              value={content}
+              onChange={(event) => setContent(event.target.value)}
+              onKeyDown={onComposerKeyDown}
+              placeholder={isReady ? "Describe the work, proof, or time you have…" : "Waiting for the match agent…"}
+              rows={1}
+              disabled={!isReady || isActive}
+              aria-label="Message"
+            />
+            <button className="send-button" type="submit" disabled={!canSend} aria-label="Send message">
+              <ArrowUp size={18} />
+            </button>
+          </form>
+          <div className="composer-meta">
+            <span>{composerError || (isActive ? "One turn at a time · matching may take a moment" : "Enter to send · Shift + Enter for newline")}</span>
+            <span className={scalarCount > 32_000 ? "limit-exceeded" : ""}>{scalarCount.toLocaleString()} / 32,000</span>
           </div>
+        </div>
+      </main>
 
-          <div className="proof-stats">
-            <div><span>merged prs</span><strong>38</strong></div>
-            <div><span>merge rate</span><strong>82%</strong></div>
-            <div><span>median ship</span><strong>1.8d</strong></div>
-          </div>
-
-          <section className="why-match" key={`signals-${selected.id}`}>
-            <div className="section-label"><Sparkles size={13} /> why this match</div>
-            <ul>
-              {selected.signals.map((signal, index) => (
-                <li key={signal}><span>{String(index + 1).padStart(2, "0")}</span><p>{signal}</p></li>
-              ))}
-            </ul>
-          </section>
-
-          <section className="repo-health">
-            <div className="section-label"><CircleDot size={13} /> repo health</div>
-            <dl>
-              <div><dt>maintainers</dt><dd>{selected.maintainers}</dd></div>
-              <div><dt>contributor merge</dt><dd>{selected.mergeRate}%</dd></div>
-              <div><dt>median response</dt><dd>{selected.responseTime}</dd></div>
-              <div><dt>scope confidence</dt><dd>high</dd></div>
-            </dl>
-          </section>
-
-          <div className="availability-block">
-            <Clock3 size={15} />
-            <div><span>your availability</span><strong>12h this week</strong></div>
-            <button type="button">edit</button>
-          </div>
-
-          <p className="trust-note">
-            Scores use public proof, issue quality, maintainer behavior, and available time. Never résumé keywords alone.
-          </p>
-        </aside>
-      </div>
+      {settingsOpen ? (
+        <>
+          <button className="drawer-scrim" type="button" onClick={() => setSettingsOpen(false)} aria-label="Close settings" />
+          <aside className="settings-drawer" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+            <div className="drawer-header">
+              <div><span className="eyebrow">match harness</span><h2 id="settings-title">Agent connection</h2></div>
+              <button className="icon-button" type="button" onClick={() => setSettingsOpen(false)} aria-label="Close settings"><X size={18} /></button>
+            </div>
+            <form onSubmit={applySettings}>
+              <fieldset className="mode-picker">
+                <legend>Transport</legend>
+                <button type="button" className={draftConfiguration.mode === "demo" ? "selected" : ""} onClick={() => setDraftConfiguration((current) => ({ ...current, mode: "demo" }))}>
+                  <Play size={16} /><span><strong>Demo</strong><small>Try local matching</small></span>
+                </button>
+                <button type="button" className={draftConfiguration.mode === "live" ? "selected" : ""} onClick={() => setDraftConfiguration((current) => ({ ...current, mode: "live" }))}>
+                  <Radio size={16} /><span><strong>Live</strong><small>Connect the harness</small></span>
+                </button>
+              </fieldset>
+              {draftConfiguration.mode === "live" ? (
+                <label className="field"><span>WebSocket URL</span><input type="url" value={draftConfiguration.url} onChange={(event) => setDraftConfiguration((current) => ({ ...current, url: event.target.value }))} placeholder="wss://api.example.com/session-chat" autoFocus /></label>
+              ) : (
+                <p className="demo-note">Demo mode simulates matching locally. Nothing you type leaves this browser.</p>
+              )}
+              <div className="harness-note"><LockKeyhole size={15} /><p><strong>The harness stays private.</strong> Tool calls, ranking, and repository analysis happen behind the response stream.</p></div>
+              {settingsError ? <p className="form-error" role="alert">{settingsError}</p> : null}
+              <button className="apply-button" type="submit">Start fresh session <ChevronRight size={17} /></button>
+            </form>
+          </aside>
+        </>
+      ) : null}
     </div>
   );
 }

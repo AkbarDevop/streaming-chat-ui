@@ -10,16 +10,16 @@ This pivot lives on `pivot/engineer-ticket-match`; the shipped Cofounder Match p
 
 ## Product thesis
 
-Issue directories optimize discovery. `ticket.run` optimizes for a credible merge.
+Issue directories optimize browsing. `ticket.run` is a private chat matcher: describe what you want to ship, add one proof and time signal, and receive one ticket worth starting.
 
-The product ranks reviewed tickets against an engineer's public proof, available time, repo health, maintainer responsiveness, and expected patch surface. One match can then become a focused execution run with a verified bounty and clear preflight notes.
+The hidden agent ranks reviewed tickets against public proof, available time, repo health, maintainer responsiveness, and expected patch surface. The frontend shows the conversation and final match—not the underlying ticket feed or tool loop.
 
 ## Prototype interactions
 
-- Search and filter the opportunity index by repository, label, or stack
-- Switch between matches and inspect fit evidence
-- Review expected scope, likely files, merge risk, and repo health
-- Claim a ticket and initialize a focused execution run
+- Describe the desired stack, problem, or working constraint in chat
+- Add a GitHub/repository proof signal and available time
+- Receive one explained match inside the conversation
+- Review fit evidence and preflight risk, then start the ticket
 - Responsive desktop and mobile layouts
 
 ## Quick start
