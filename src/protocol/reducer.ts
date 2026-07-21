@@ -50,14 +50,24 @@ function reduceServerMessage(
       if (state.connection !== "awaiting-history") {
         throw new Error("History received outside initialization");
       }
+
+      /*
+       * A fresh History snapshot is authoritative for durable server records,
+       * but it cannot resolve a turn whose socket disappeared mid-flight. Keep
+       * those local records separate until the product can ask the user how to
+       * handle them; never infer identity by matching message text.
+       */
+      const unresolvedLocalTurns = state.localTurns.filter(
+        (turn) => turn.status === "unresolved",
+      );
+
       return {
         ...state,
         connection: "ready",
         history: message.items,
-        localTurns: [],
+        localTurns: unresolvedLocalTurns,
         activeTurn: null,
         completedTurn: null,
-        unresolvedTurn: null,
         lastError: null,
       };
 

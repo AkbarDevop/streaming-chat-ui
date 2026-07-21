@@ -21,7 +21,7 @@ The frontend presents one simple conversation. The matching harness can privatel
 - Built-in cofounder interview demo that works without a backend
 - Configurable live WebSocket connection for the real matching harness
 - Responsive desktop and mobile UI
-- Protocol-correct streaming with 19 regression tests
+- Protocol-correct streaming with 37 regression tests
 
 ## Quick start
 

@@ -27,6 +27,13 @@ describe("client encoders", () => {
       "User message exceeds 32,000 Unicode scalar values",
     );
   });
+
+  it("emits only the documented UserMessage fields", () => {
+    expect(JSON.parse(encodeUserMessage("Hello"))).toEqual({
+      type: "UserMessage",
+      content: "Hello",
+    });
+  });
 });
 
 describe("server decoder", () => {
@@ -69,8 +76,20 @@ describe("server decoder", () => {
     '{"type":"AssistantStarted"}',
     '{"type":"assistantDelta","content":"A"}',
     '{"type":"AssistantDone","content":"missing reason"}',
+    '{"type":"AssistantDone","content":"bad reason","finish_reason":"stop"}',
+    '{"type":"AssistantDelta","content":1}',
+    '{"type":"Error","code":1,"message":"Bad"}',
     '{"type":"History","items":[{"role":"user","content":"Hi","created_at":[1,2]}]}',
+    '{"type":"History","items":[{"role":"tool","content":"Hidden","created_at":[1,2,3,4,5,6,7,8,9]}]}',
   ])("rejects protocol-invalid input: %s", (input) => {
     expect(() => decodeServerMessage(input)).toThrow();
+  });
+
+  it("ignores undocumented server fields without assigning them meaning", () => {
+    expect(
+      decodeServerMessage(
+        '{"type":"AssistantDelta","content":"A","sequence":42}',
+      ),
+    ).toEqual({ type: "AssistantDelta", content: "A" });
   });
 });

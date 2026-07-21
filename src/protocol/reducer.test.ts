@@ -105,6 +105,98 @@ describe("protocol reducer", () => {
     expect(state.localTurns[0].status).toBe("unresolved");
   });
 
+  it("replaces durable History but preserves an uncertain local turn", () => {
+    let state = readyState();
+    state = protocolReducer(state, {
+      type: "USER_MESSAGE_SENT",
+      content: "Did the server receive this?",
+    });
+    state = server(state, { type: "AssistantDelta", content: "Possibly" });
+    state = protocolReducer(state, { type: "SOCKET_CLOSED" });
+    state = protocolReducer(state, { type: "CONNECT_STARTED" });
+    state = protocolReducer(state, { type: "SOCKET_OPENED" });
+    state = server(state, {
+      type: "History",
+      items: [
+        {
+          role: "assistant",
+          content: "Durable history",
+          created_at: [2024, 1, 0, 0, 0, 0, 0, 0, 0],
+        },
+      ],
+    });
+
+    expect(state.history).toHaveLength(1);
+    expect(state.localTurns).toEqual([
+      expect.objectContaining({
+        userContent: "Did the server receive this?",
+        assistantContent: "Possibly",
+        status: "unresolved",
+      }),
+    ]);
+    expect(state.unresolvedTurn).toEqual({
+      userContent: "Did the server receive this?",
+      partialAssistantContent: "Possibly",
+      reason: "connection-lost",
+    });
+  });
+
+  it("drops settled local turns when a new History snapshot arrives", () => {
+    let state = readyState();
+    state = protocolReducer(state, {
+      type: "USER_MESSAGE_SENT",
+      content: "Settled turn",
+    });
+    state = server(state, {
+      type: "AssistantDone",
+      content: "Settled answer",
+      finish_reason: "completed",
+    });
+    state = protocolReducer(state, { type: "SOCKET_CLOSED" });
+    state = protocolReducer(state, { type: "CONNECT_STARTED" });
+    state = protocolReducer(state, { type: "SOCKET_OPENED" });
+    state = server(state, { type: "History", items: [] });
+
+    expect(state.localTurns).toEqual([]);
+  });
+
+  it("rejects deltas and completions without an active turn", () => {
+    const state = readyState();
+
+    expect(() =>
+      server(state, { type: "AssistantDelta", content: "Unexpected" }),
+    ).toThrow("AssistantDelta without active turn");
+    expect(() =>
+      server(state, {
+        type: "AssistantDone",
+        content: "Unexpected",
+        finish_reason: "completed",
+      }),
+    ).toThrow("AssistantDone without active turn");
+  });
+
+  it("keeps initialization errors in their protocol-defined phases", () => {
+    let awaitingHistory = createInitialProtocolState();
+    awaitingHistory = protocolReducer(awaitingHistory, {
+      type: "CONNECT_STARTED",
+    });
+    awaitingHistory = protocolReducer(awaitingHistory, { type: "SOCKET_OPENED" });
+
+    const initializationFailed = server(awaitingHistory, {
+      type: "Error",
+      code: "initialization_failed",
+      message: "Failed to initialize",
+    });
+    expect(initializationFailed.connection).toBe("awaiting-history");
+
+    const alreadyInitialized = server(awaitingHistory, {
+      type: "Error",
+      code: "already_initialized",
+      message: "Already initialized",
+    });
+    expect(alreadyInitialized.connection).toBe("ready");
+  });
+
   it("rejects a second History snapshot on one initialized connection", () => {
     const state = readyState();
     expect(() =>
