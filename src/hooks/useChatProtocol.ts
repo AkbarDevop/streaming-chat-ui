@@ -1,17 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { CompatibleChatProtocol } from "../protocol/CompatibleChatProtocol";
 import { DemoChatProtocol } from "../protocol/DemoChatProtocol";
+import { OpenAITicketProtocol } from "../protocol/OpenAITicketProtocol";
 import { createInitialProtocolState } from "../protocol/reducer";
 import type {
   ChatProtocolClient,
   ProtocolState,
 } from "../protocol/types";
-import { DEFAULT_FRAMEWORKS } from "../protocol/types";
 
 export interface ChatConfiguration {
-  mode: "demo" | "live";
-  url: string;
-  username: string;
+  mode: "demo" | "openai";
+  apiKey: string;
 }
 
 export function useChatProtocol(configuration: ChatConfiguration) {
@@ -27,12 +25,7 @@ export function useChatProtocol(configuration: ChatConfiguration) {
     const client: ChatProtocolClient =
       configuration.mode === "demo"
         ? new DemoChatProtocol(onState)
-        : new CompatibleChatProtocol(
-            configuration.url,
-            configuration.username,
-            DEFAULT_FRAMEWORKS,
-            onState,
-          );
+        : new OpenAITicketProtocol(configuration.apiKey, onState);
 
     clientRef.current = client;
     client.connect();
@@ -44,8 +37,7 @@ export function useChatProtocol(configuration: ChatConfiguration) {
     };
   }, [
     configuration.mode,
-    configuration.url,
-    configuration.username,
+    configuration.apiKey,
   ]);
 
   const sendMessage = useCallback((content: string) => {

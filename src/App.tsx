@@ -29,14 +29,9 @@ import {
   useChatProtocol,
 } from "./hooks/useChatProtocol";
 import { countUnicodeScalars } from "./protocol/codec";
-import {
-  normalizeUsername,
-  USERNAME_PATTERN,
-  validateUsername,
-} from "./protocol/connection";
 import type { LocalTurn, ProtocolState } from "./protocol/types";
 
-const USERNAME_STORAGE_KEY = "ticket.run.username";
+const OPENAI_KEY_SESSION_KEY = "ticket.run.openai-key";
 
 const STARTING_PROMPTS = [
   "Find me a TypeScript ticket I can ship this weekend.",
@@ -161,26 +156,24 @@ interface DisplayMessage {
 }
 
 function createInitialConfiguration(): ChatConfiguration {
-  const url = import.meta.env.VITE_CHAT_WS_URL?.trim() ?? "";
-  const environmentUsername = import.meta.env.VITE_CHAT_USERNAME?.trim() ?? "";
-  let storedUsername = "";
+  const environmentApiKey = import.meta.env.VITE_OPENAI_API_KEY?.trim() ?? "";
+  let sessionApiKey = "";
 
   try {
-    storedUsername = window.localStorage.getItem(USERNAME_STORAGE_KEY) ?? "";
+    sessionApiKey = window.sessionStorage.getItem(OPENAI_KEY_SESSION_KEY) ?? "";
   } catch {
     // Storage can be unavailable in privacy-restricted browser contexts.
   }
 
-  const username = normalizeUsername(storedUsername || environmentUsername);
+  const apiKey = sessionApiKey || environmentApiKey;
   return {
-    mode: url && USERNAME_PATTERN.test(username) ? "live" : "demo",
-    url,
-    username,
+    mode: apiKey ? "openai" : "demo",
+    apiKey,
   };
 }
 
 function connectionLabel(state: ProtocolState, mode: ChatConfiguration["mode"]): string {
-  if (state.connection === "ready") return mode === "demo" ? "Demo agent" : "Agent online";
+  if (state.connection === "ready") return mode === "demo" ? "Demo agent" : "OpenAI agent";
   if (state.connection === "connecting") return "Booting agent";
   if (state.connection === "awaiting-history") return "Syncing thread";
   return "Offline";
@@ -379,31 +372,26 @@ export default function App() {
 
   const applySettings = (event: FormEvent) => {
     event.preventDefault();
-    const url = draftConfiguration.url.trim();
-    let username = normalizeUsername(draftConfiguration.username);
-    if (draftConfiguration.mode === "live" && !/^wss?:\/\//i.test(url)) {
-      setSettingsError("Enter a WebSocket URL beginning with ws:// or wss://.");
-      return;
-    }
-
-    if (draftConfiguration.mode === "live") {
-      try {
-        username = validateUsername(username);
-      } catch (error) {
-        setSettingsError(
-          error instanceof Error ? error.message : "Enter a valid username.",
-        );
+    const apiKey = draftConfiguration.apiKey.trim();
+    if (draftConfiguration.mode === "openai") {
+      if (!apiKey) {
+        setSettingsError("Enter an OpenAI API key.");
         return;
       }
-
       try {
-        window.localStorage.setItem(USERNAME_STORAGE_KEY, username);
+        window.sessionStorage.setItem(OPENAI_KEY_SESSION_KEY, apiKey);
       } catch {
-        // The in-memory value still supports reconnects during this page load.
+        // The in-memory key still supports this page load.
+      }
+    } else {
+      try {
+        window.sessionStorage.removeItem(OPENAI_KEY_SESSION_KEY);
+      } catch {
+        // Storage can be unavailable in privacy-restricted browser contexts.
       }
     }
 
-    const next = { ...draftConfiguration, url, username };
+    const next = { ...draftConfiguration, apiKey };
     const unchanged = JSON.stringify(next) === JSON.stringify(configuration);
     setSettingsOpen(false);
     setSettingsError("");
@@ -446,8 +434,8 @@ export default function App() {
         <div className="rail-footer">
           <LockKeyhole size={15} aria-hidden="true" />
           <div>
-            <strong>Search happens privately</strong>
-            <span>No tool calls or ranking noise in your thread.</span>
+            <strong>No ticket backend</strong>
+            <span>OpenAI ranks the fake catalog directly in your browser.</span>
           </div>
         </div>
       </aside>
@@ -575,50 +563,39 @@ export default function App() {
             </div>
             <form onSubmit={applySettings}>
               <fieldset className="mode-picker">
-                <legend>Transport</legend>
+                <legend>Agent</legend>
                 <button type="button" className={draftConfiguration.mode === "demo" ? "selected" : ""} onClick={() => setDraftConfiguration((current) => ({ ...current, mode: "demo" }))}>
-                  <Play size={16} /><span><strong>Demo</strong><small>Try local matching</small></span>
+                  <Play size={16} /><span><strong>Local demo</strong><small>No API key needed</small></span>
                 </button>
-                <button type="button" className={draftConfiguration.mode === "live" ? "selected" : ""} onClick={() => setDraftConfiguration((current) => ({ ...current, mode: "live" }))}>
-                  <Radio size={16} /><span><strong>Live</strong><small>Connect the harness</small></span>
+                <button type="button" className={draftConfiguration.mode === "openai" ? "selected" : ""} onClick={() => setDraftConfiguration((current) => ({ ...current, mode: "openai" }))}>
+                  <Radio size={16} /><span><strong>OpenAI</strong><small>Direct browser call</small></span>
                 </button>
               </fieldset>
-              {draftConfiguration.mode === "live" ? (
+              {draftConfiguration.mode === "openai" ? (
                 <div className="live-fields">
                   <label className="field">
-                    <span>Username</span>
+                    <span>OpenAI API key</span>
                     <input
-                      type="text"
-                      value={draftConfiguration.username}
-                      onChange={(event) => setDraftConfiguration((current) => ({ ...current, username: event.target.value }))}
-                      placeholder="alice_123"
+                      type="password"
+                      value={draftConfiguration.apiKey}
+                      onChange={(event) => setDraftConfiguration((current) => ({ ...current, apiKey: event.target.value }))}
+                      placeholder="sk-…"
                       autoCapitalize="none"
                       autoCorrect="off"
                       spellCheck={false}
-                      maxLength={32}
                       autoFocus
                     />
-                    <small>Saved on this device · lowercased automatically</small>
-                  </label>
-                  <label className="field">
-                    <span>WebSocket server</span>
-                    <input
-                      type="url"
-                      value={draftConfiguration.url}
-                      onChange={(event) => setDraftConfiguration((current) => ({ ...current, url: event.target.value }))}
-                      placeholder="wss://api.example.com"
-                    />
-                    <small>The client connects to /chat?username=…</small>
+                    <small>Kept only for this browser tab</small>
                   </label>
                   <div className="auth-warning">
                     <CircleAlert size={15} />
-                    <p><strong>Username is not authentication.</strong> There is no password, so anyone can claim any username.</p>
+                    <p><strong>MVP only.</strong> A browser-held API key can be inspected. Do not embed a production key in a public build.</p>
                   </div>
                 </div>
               ) : (
                 <p className="demo-note">Demo mode simulates matching locally. Nothing you type leaves this browser.</p>
               )}
-              <div className="harness-note"><LockKeyhole size={15} /><p><strong>The harness stays private.</strong> Tool calls, ranking, and repository analysis happen behind the response stream.</p></div>
+              <div className="harness-note"><LockKeyhole size={15} /><p><strong>Fake-ticket MVP.</strong> The model can only select from the five fixture tickets included in its system prompt.</p></div>
               {settingsError ? <p className="form-error" role="alert">{settingsError}</p> : null}
               <button className="apply-button" type="submit">Start fresh session <ChevronRight size={17} /></button>
             </form>

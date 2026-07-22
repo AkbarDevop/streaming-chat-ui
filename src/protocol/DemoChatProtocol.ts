@@ -16,6 +16,7 @@ const PROOF_PATTERN =
   /github\.com|gitlab\.com|https?:\/\/|\b(i|we)\s+(built|shipped|merged|maintain|created|launched|contributed)\b|\b(repo|repository|project|pull request|\bpr\b)\b/i;
 const AVAILABILITY_PATTERN =
   /\b\d+\s*(hours?|hrs?|days?)\b|this (week|weekend|month)|today|tomorrow|nights?|weekends?|part[\s-]?time|full[\s-]?time|easy|medium|hard|stretch/i;
+const BARE_GITHUB_HANDLE_PATTERN = /^@?[a-z\d](?:[a-z\d-]{1,37}[a-z\d])?$/i;
 
 function cleanAnswer(value: string, maxLength = 220): string {
   const cleaned = value.trim().replace(/\s+/g, " ");
@@ -27,7 +28,9 @@ function buildDemoBrief(answers: string[]): DemoEngineerBrief {
 
   for (const rawAnswer of answers) {
     const answer = cleanAnswer(rawAnswer);
-    const hasProof = PROOF_PATTERN.test(answer);
+    const hasProof =
+      PROOF_PATTERN.test(answer) ||
+      Boolean(brief.request && BARE_GITHUB_HANDLE_PATTERN.test(answer));
     const hasAvailability = AVAILABILITY_PATTERN.test(answer);
 
     if (hasProof && !brief.proof) brief.proof = answer;

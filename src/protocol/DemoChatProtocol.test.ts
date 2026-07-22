@@ -12,6 +12,16 @@ describe("demo ticket matcher", () => {
     expect(response).not.toContain("[[ticket:");
   });
 
+  it("accepts a bare GitHub username as the remaining proof signal", () => {
+    const response = createDemoResponse([
+      "Find me a TypeScript ticket I can ship this weekend.",
+      "akbardevop",
+    ]);
+
+    expect(response).toContain("[[ticket:cal-16841]]");
+    expect(response).not.toContain("paste your GitHub profile");
+  });
+
   it("asks only for the remaining signal", () => {
     const proofOnly = createDemoResponse([
       "I want TypeScript scheduling work",
